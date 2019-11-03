@@ -32,6 +32,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.Type;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.phoenix.compile.QueryPlan;
@@ -77,6 +78,7 @@ import static io.prestosql.plugin.jdbc.StandardColumnMappings.doubleWriteFunctio
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.realColumnMapping;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.realWriteFunction;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.timeWriteFunctionUsingSqlTime;
+import static io.prestosql.plugin.jdbc.StandardColumnMappings.timestampWriteFunctionUsingSqlTimestamp;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.varcharColumnMapping;
 import static io.prestosql.plugin.jdbc.TypeHandlingJdbcPropertiesProvider.getUnsupportedTypeHandling;
 import static io.prestosql.plugin.jdbc.UnsupportedTypeHandling.CONVERT_TO_VARCHAR;
@@ -94,6 +96,7 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.TimeType.TIME;
 import static io.prestosql.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static java.lang.String.format;
@@ -103,7 +106,6 @@ import static java.sql.Types.FLOAT;
 import static java.sql.Types.LONGNVARCHAR;
 import static java.sql.Types.LONGVARCHAR;
 import static java.sql.Types.NVARCHAR;
-import static java.sql.Types.TIMESTAMP;
 import static java.sql.Types.TIMESTAMP_WITH_TIMEZONE;
 import static java.sql.Types.TIME_WITH_TIMEZONE;
 import static java.sql.Types.VARCHAR;
@@ -245,7 +247,6 @@ public class PhoenixClient
                 }
                 break;
             // TODO add support for TIMESTAMP after Phoenix adds support for LocalDateTime
-            case TIMESTAMP:
             case TIME_WITH_TIMEZONE:
             case TIMESTAMP_WITH_TIMEZONE:
                 if (getUnsupportedTypeHandling(session) == CONVERT_TO_VARCHAR) {
@@ -283,6 +284,9 @@ public class PhoenixClient
         }
         if (TIME.equals(type)) {
             return WriteMapping.longMapping("time", timeWriteFunctionUsingSqlTime(session));
+        }
+        if (TIMESTAMP.equals(type)) {
+            return WriteMapping.longMapping("timestamp", timestampWriteFunctionUsingSqlTimestamp(session));
         }
         // Phoenix doesn't support _WITH_TIME_ZONE
         if (TIME_WITH_TIME_ZONE.equals(type) || TIMESTAMP_WITH_TIME_ZONE.equals(type)) {
@@ -365,7 +369,7 @@ public class PhoenixClient
             PName physicalTableName = queryPlan.getTableRef().getTable().getPhysicalName();
             PhoenixConnection phoenixConnection = context.getConnection();
             ConnectionQueryServices services = phoenixConnection.getQueryServices();
-            services.clearTableRegionCache(physicalTableName.getBytes());
+            services.clearTableRegionCache(TableName.valueOf(physicalTableName.getBytes()));
 
             for (Scan scan : scans) {
                 scan = new Scan(scan);
